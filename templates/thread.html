@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block content%}
+<div class="row">
+    <div class="col-lg-6">
+       <h4> Your chats with {% if request.user != thread.first%}{{thread.first.username}}{%else%}{{thread.second.username}}{%endif%}</h4>
+        <ul id="chat-items">
+            {% for chat in chats%}
+            <li {%if request.user == chat.user%} style="text-align:right;"{%endif%}>{{chat.message}}  <b>[{{chat.user}}]</b></li>
+            {% endfor%}
+        </ul>
+        <form method="POST" action='' id="form">
+            {%csrf_token%}
+            <input hidden id="current_user" value="{{request.user}}"
+            {{form.as_p}}
+            <input type="submit" class="btn btn-primary" value="send">
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+{% block script%}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reconnecting-websocket/1.0.0/reconnecting-websocket.min.js"\
+ integrity="sha512-B4skI5FiLurS86aioJx9VfozI1wjqrn6aTdJH+YQUmCZum/ZibPBTX55k5d9XM6EsKePDInkLVrN7vPmJxc1qA==" crossorigin="anonymous"></script>
+
+<script>
+    var formData = $('#form')
+    var msgInput = $('#id_message')
+    var chatHolder = $('#chat-items')
+    var current_user = $('#current_user').val()
+    console.log(current_user)
+    var loc = window.location
+    var wsStart = 'ws://'
+    if(loc.protocol == 'https:'){
+        wsStart = 'wss://'
+    }
+    var endpoint = wsStart + loc.host + loc.pathname
+    console.log(loc.pathname)
+var socket = new ReconnectingWebSocket(endpoint)
+socket.onmessage = function(e){
+    console.log('message' + e)
+    chatData = JSON.parse(e.data) // this is to convert the string back to a dictionary
+    if(chatData.username == current_user){
+        chatHolder.append("<li style='text-align:right;'>" + chatData.message + ' ' + '<b>' + '[' +  chatData.username + ']' + '</b>' + '</li>')
+    }
+    else{
+        chatHolder.append("<li>" + chatData.message + ' ' + '<b>' + '[' +  chatData.username + ']' + '</b>' + '</li>')
+    }
+}
+socket.onopen = function(e){
+    formData.submit(function(event){
+        event.preventDefault()
+        var msgText = msgInput.val()
+        finalData = {
+            'msg':msgText
+        }
+        socket.send(JSON.stringify(finalData)) //json.stringify converts a dictionary to a string so we can send it to the backend 
+        formData[0].reset()
+    })
+    console.log('open' + e)
+}
+socket.onerror = function(e){
+    console.log('error' + e)
+}
+socket.onclose = function(e){
+    console.log('close' + e)
+}
+
+</script>
+{% endblock%}
